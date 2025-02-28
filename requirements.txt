@@ -1,4 +1,5 @@
 numpy     
 pandas    
+pandas-stubs
 matplotlib
 seaborn   
