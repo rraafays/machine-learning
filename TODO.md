@@ -1,0 +1,6 @@
+- [x] clean the dataset
+- [ ] do any preprocessing steps
+- [ ] select an algorithm to use
+- [ ] analyse the data distribution
+- [ ] make a prediction
+- [ ] analyse the difficulty of my prediction
