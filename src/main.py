@@ -1,54 +1,58 @@
 #!/usr/bin/env python3
 
+# Step 1: Load, Clean & Normalize the Data
+
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder
 
-# Load dataset
-file_path = "./cwdata.csv"
+# Load the dataset
+file_path = "./cwdata.csv"  # Provided dataset
 df = pd.read_csv(file_path)
 
-# Drop unnecessary unnamed columns
-df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-
-# Identify numerical and categorical columns
-numerical_cols = df.select_dtypes(include=['number']).columns.tolist()
-categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
-
-# Fill missing values
-df[numerical_cols] = df[numerical_cols].apply(lambda col: col.fillna(col.median()))
-df[categorical_cols] = df[categorical_cols].apply(lambda col: col.fillna(col.mode()[0]))
-
-# Encode categorical variables
-label_encoders = {}
-for col in categorical_cols:
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col].astype(str))
-    label_encoders[col] = le
-
-# Normalize numerical features
-scaler = StandardScaler()
-df[numerical_cols] = scaler.fit_transform(df[numerical_cols])
-
-# Display the first few rows of the cleaned dataset
-print("Cleaned Dataset Sample:")
+# Display the first few rows to understand the structure
 print(df.head())
 
-# Plot feature distributions
-df.hist(figsize=(12, 10), bins=30, color='skyblue', edgecolor='black')
-plt.suptitle("Feature Distributions")
-plt.show()
+# Step 1: Data Cleaning
 
-# Correlation Heatmap
-plt.figure(figsize=(12, 8))
-sns.heatmap(df.corr(), annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
-plt.title("Feature Correlation Heatmap")
-plt.show()
+# Drop irrelevant or unnamed columns
+df = df.drop(columns=["Unnamed: 10"], errors="ignore")
 
-# Boxplots to detect outliers
-plt.figure(figsize=(12, 6))
-sns.boxplot(data=df, orient='h')
-plt.title("Boxplot of Features (Detecting Outliers)")
-plt.show()
+# Standardize categorical values (making them consistent)
+df["Employed"] = df["Employed"].str.strip().str.lower().map({"y": 1, "yes": 1, "n": 0, "no": 0, np.nan: 0})
+df["Home Owner"] = df["Home Owner"].str.strip().str.lower().map({"y": 1, "yes": 1, "n": 0, "no": 0, np.nan: 0})
+df["Fraud"] = df["Fraud"].str.strip().str.lower().map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1, "0": 0, np.nan: 0})
+
+# Encode categorical features (Gender, Area, Education, Colour)
+label_encoders = {}
+for col in ["Gender", "Area", "Education", "Colour"]:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col].astype(str))
+    label_encoders[col] = le  # Save encoder for reference
+
+# Handle missing or non-numeric values before scaling
+df[["Income", "Balance", "Age"]] = df[["Income", "Balance", "Age"]].replace(" ", np.nan).astype(float)
+
+# Normalize numerical values (Income, Balance, Age)
+scaler = MinMaxScaler()
+df[["Income", "Balance", "Age"]] = scaler.fit_transform(df[["Income", "Balance", "Age"]])
+
+# Show the cleaned dataset
+print(df.head())
+
+# Ensure numerical columns have proper numeric values
+df["Income"] = pd.to_numeric(df["Income"], errors='coerce')  # Convert errors to NaN
+df["Balance"] = pd.to_numeric(df["Balance"], errors='coerce')
+df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
+
+# Fill missing numerical values with the median (better than mean for robustness)
+df["Income"] = df["Income"].fillna(df["Income"].median())
+df["Balance"] = df["Balance"].fillna(df["Balance"].median())
+df["Age"] = df["Age"].fillna(df["Age"].median())
+
+# Normalize numerical values after fixing them
+scaler = MinMaxScaler()
+df[["Income", "Balance", "Age"]] = scaler.fit_transform(df[["Income", "Balance", "Age"]])
+
+# Show cleaned dataset
+df.head()
