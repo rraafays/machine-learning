@@ -56,3 +56,31 @@ df[["Income", "Balance", "Age"]] = scaler.fit_transform(df[["Income", "Balance",
 
 # Show cleaned dataset
 df.head()
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Step 2: Data Visualization & Feature Analysis
+
+# Distribution of numerical features (Income, Balance, Age)
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+sns.histplot(df["Income"], bins=30, ax=axes[0], kde=True).set(title="Income Distribution")
+sns.histplot(df["Balance"], bins=30, ax=axes[1], kde=True).set(title="Balance Distribution")
+sns.histplot(df["Age"], bins=30, ax=axes[2], kde=True).set(title="Age Distribution")
+
+plt.show()
+
+# Box plots for outliers in numerical features
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+sns.boxplot(y=df["Income"], ax=axes[0]).set(title="Income Box Plot")
+sns.boxplot(y=df["Balance"], ax=axes[1]).set(title="Balance Box Plot")
+sns.boxplot(y=df["Age"], ax=axes[2]).set(title="Age Box Plot")
+
+plt.show()
+
+# Correlation matrix heatmap
+plt.figure(figsize=(10, 6))
+sns.heatmap(df.corr(), annot=True, cmap="coolwarm", fmt=".2f")
+plt.title("Feature Correlation Heatmap")
+plt.show()
