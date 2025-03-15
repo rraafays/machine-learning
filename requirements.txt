@@ -4,3 +4,4 @@ pandas-stubs
 seaborn   
 matplotlib
 scikit-learn
+kagglehub
