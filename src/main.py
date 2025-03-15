@@ -35,3 +35,20 @@ df[numerical_cols] = scaler.fit_transform(df[numerical_cols])
 # Display the first few rows of the cleaned dataset
 print("Cleaned Dataset Sample:")
 print(df.head())
+
+# Plot feature distributions
+df.hist(figsize=(12, 10), bins=30, color='skyblue', edgecolor='black')
+plt.suptitle("Feature Distributions")
+plt.show()
+
+# Correlation Heatmap
+plt.figure(figsize=(12, 8))
+sns.heatmap(df.corr(), annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
+plt.title("Feature Correlation Heatmap")
+plt.show()
+
+# Boxplots to detect outliers
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=df, orient='h')
+plt.title("Boxplot of Features (Detecting Outliers)")
+plt.show()
