@@ -3,4 +3,4 @@ pandas
 pandas-stubs
 seaborn   
 matplotlib
-ace_tools
+scikit-learn
