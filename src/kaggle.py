@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 
+from sklearn.metrics import confusion_matrix
+import os
+import seaborn as sns
+import matplotlib.pyplot as plt
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+import torch.optim as optim
+import torch.nn as nn
+import torchvision
+import torch
 import kagglehub
 
 # Download latest version
-path = kagglehub.dataset_download("thedownhill/art-images-drawings-painting-sculpture-engraving")
+path = kagglehub.dataset_download(
+    "thedownhill/art-images-drawings-painting-sculpture-engraving")
 path = path + "/dataset/dataset_updated"
 
 print("Path to dataset files:", path)
 
-import torch
-import torchvision
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-from PIL import Image
-from sklearn.metrics import confusion_matrix
-import numpy as np
 
 # Ensure PyTorch uses GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -36,6 +35,8 @@ transform = transforms.Compose([
 ])
 
 # Custom Dataset class to handle corrupted images
+
+
 class SafeImageFolder(torchvision.datasets.ImageFolder):
     def __getitem__(self, index):
         path, target = self.samples[index]
@@ -48,6 +49,7 @@ class SafeImageFolder(torchvision.datasets.ImageFolder):
             print(f"Skipping corrupted image: {path}")
             return self.__getitem__((index + 1) % len(self.samples))
 
+
 # Load datasets
 train_data = SafeImageFolder(root=train_set, transform=transform)
 val_data = SafeImageFolder(root=val_set, transform=transform)
@@ -57,6 +59,8 @@ train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_data, batch_size=32, shuffle=False)
 
 # Define CNN Model
+
+
 class ArtCNN(nn.Module):
     def __init__(self, num_classes):
         super(ArtCNN, self).__init__()
@@ -77,6 +81,7 @@ class ArtCNN(nn.Module):
         x = self.fc2(x)
         return x
 
+
 # Initialize model
 num_classes = len(train_data.classes)
 model = ArtCNN(num_classes).to(device)
@@ -90,7 +95,7 @@ train_losses, val_losses = [], []
 for epoch in range(epochs):
     model.train()
     running_loss = 0.0
-    
+
     for images, labels in train_loader:
         images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
@@ -99,7 +104,7 @@ for epoch in range(epochs):
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
-    
+
     avg_train_loss = running_loss / len(train_loader)
     train_losses.append(avg_train_loss)
 
@@ -112,11 +117,12 @@ for epoch in range(epochs):
             outputs = model(images)
             val_loss = criterion(outputs, labels)
             running_val_loss += val_loss.item()
-    
+
     avg_val_loss = running_val_loss / len(val_loader)
     val_losses.append(avg_val_loss)
 
-    print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train_loss:.4f} - Val Loss: {avg_val_loss:.4f}")
+    print(f"Epoch {epoch+1}/{epochs} - "
+          f"Train Loss: {avg_train_loss:.4f} - Val Loss: {avg_val_loss:.4f}")
 
 # Plot Training & Validation Loss
 plt.plot(range(1, epochs+1), train_losses, label="Train Loss")
@@ -149,7 +155,8 @@ print(f"Validation Accuracy: {accuracy:.2f}%")
 # Confusion Matrix
 cm = confusion_matrix(actual_labels, predictions)
 plt.figure(figsize=(6, 5))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=train_data.classes, yticklabels=train_data.classes)
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=train_data.classes, yticklabels=train_data.classes)
 plt.xlabel("Predicted Label")
 plt.ylabel("True Label")
 plt.title("Confusion Matrix")
