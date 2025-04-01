@@ -108,15 +108,16 @@ sns.heatmap(df.corr(), annot=True, cmap="coolwarm", fmt=".2f")
 plt.title("Feature Correlation Heatmap")
 plt.show()
 
-# Step 3: Supervised Learning - Classification & Regression
+# Step 3: Unsupervised Learning - Classification & Regression
 
 # Define features and target variables
-X = df.drop(columns=["Fraud"])  # Features (everything except Fraud)
+# Features (everything except Fraud)
+X_unsupervised = df.drop(columns=["Fraud"])
 y_classification = df["Fraud"]  # Target for classification
 
 # Split data into training and testing sets (80% train, 20% test)
 X_train, X_test, y_train_class, y_test_class = train_test_split(
-    X, y_classification, test_size=0.2, random_state=42)
+    X_unsupervised, y_classification, test_size=0.2, random_state=42)
 
 # Train a Classification Model (Random Forest Classifier)
 clf = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -132,7 +133,7 @@ classification_report_text = classification_report(y_test_class, y_pred_class)
 # Train a Regression Model (Predicting Balance from other features)
 y_regression = df["Balance"]  # Target for regression
 X_train_reg, X_test_reg, y_train_reg, y_test_reg = train_test_split(
-    X, y_regression, test_size=0.2, random_state=42)
+    X_unsupervised, y_regression, test_size=0.2, random_state=42)
 
 regressor = RandomForestRegressor(n_estimators=100, random_state=42)
 regressor.fit(X_train_reg, y_train_reg)
@@ -147,9 +148,6 @@ regression_mse = mean_squared_error(y_test_reg, y_pred_reg)
 print(classification_acc, classification_report_text, regression_mse)
 
 # Step 4: Unsupervised Learning - Clustering
-
-# Remove the label column (Fraud) for unsupervised learning
-X_unsupervised = df.drop(columns=["Fraud"])
 
 # Handle missing values
 imputer = SimpleImputer(strategy='mean')
