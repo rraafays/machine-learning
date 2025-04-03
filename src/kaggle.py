@@ -12,29 +12,22 @@ import torchvision
 import torch
 import kagglehub
 
-# Download latest version
 path = kagglehub.dataset_download(
     "thedownhill/art-images-drawings-painting-sculpture-engraving")
 path = path + "/dataset/dataset_updated"
 
 print("Path to dataset files:", path)
 
-
-# Ensure PyTorch uses GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Paths to dataset
 train_set = os.path.join(path, "training_set")
 val_set = os.path.join(path, "validation_set")
 
-# Define image transformations
 transform = transforms.Compose([
     transforms.Resize((128, 128)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
-
-# Custom Dataset class to handle corrupted images
 
 
 class SafeImageFolder(torchvision.datasets.ImageFolder):
@@ -45,20 +38,17 @@ class SafeImageFolder(torchvision.datasets.ImageFolder):
             if self.transform is not None:
                 image = self.transform(image)
             return image, target
-        except (IOError, OSError, RuntimeError) as e:
+        except (IOError, OSError, RuntimeError) as error:
             print(f"Skipping corrupted image: {path}")
+            print(error)
             return self.__getitem__((index + 1) % len(self.samples))
 
 
-# Load datasets
 train_data = SafeImageFolder(root=train_set, transform=transform)
 val_data = SafeImageFolder(root=val_set, transform=transform)
 
-# Create DataLoaders
 train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_data, batch_size=32, shuffle=False)
-
-# Define CNN Model
 
 
 class ArtCNN(nn.Module):
@@ -82,13 +72,11 @@ class ArtCNN(nn.Module):
         return x
 
 
-# Initialize model
 num_classes = len(train_data.classes)
 model = ArtCNN(num_classes).to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# Training Loop
 epochs = 15
 train_losses, val_losses = [], []
 
@@ -108,7 +96,6 @@ for epoch in range(epochs):
     avg_train_loss = running_loss / len(train_loader)
     train_losses.append(avg_train_loss)
 
-    # Validation
     model.eval()
     running_val_loss = 0.0
     with torch.no_grad():
@@ -124,7 +111,6 @@ for epoch in range(epochs):
     print(f"Epoch {epoch+1}/{epochs} - "
           f"Train Loss: {avg_train_loss:.4f} - Val Loss: {avg_val_loss:.4f}")
 
-# Plot Training & Validation Loss
 plt.plot(range(1, epochs+1), train_losses, label="Train Loss")
 plt.plot(range(1, epochs+1), val_losses, label="Validation Loss")
 plt.xlabel("Epochs")
@@ -133,7 +119,6 @@ plt.legend()
 plt.title("Training vs Validation Loss")
 plt.show()
 
-# Evaluate Model
 model.eval()
 correct = 0
 total = 0
@@ -152,7 +137,6 @@ with torch.no_grad():
 accuracy = correct / total * 100
 print(f"Validation Accuracy: {accuracy:.2f}%")
 
-# Confusion Matrix
 cm = confusion_matrix(actual_labels, predictions)
 plt.figure(figsize=(6, 5))
 sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
