@@ -340,7 +340,7 @@ def main():
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
 
     # Learning rate scheduler with cosine annealing
-    epochs = 10
+    epochs = 20
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=epochs, eta_min=1e-6)
 
