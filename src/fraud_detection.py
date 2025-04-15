@@ -198,12 +198,15 @@ def clean_data(df):
 
     # Convert binary fields to 1/0
     print("Converting binary fields to numerical values...")
-    df["Employed"] = df["Employed"].astype(str).str.strip().str.lower().map(
-        {"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1, "0": 0, "": 0, "nan": 0})
-    df["Home Owner"] = df["Home Owner"].astype(str).str.strip().str.lower().map(
-        {"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1, "0": 0, "": 0, "nan": 0})
-    df["Fraud"] = df["Fraud"].astype(str).str.strip().str.lower().map(
-        {"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1, "0": 0, "": 0, "nan": 0})
+    df["Employed"] = (df["Employed"].astype(str).str.strip().str.lower()
+                      .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
+                           "0": 0, "": 0, "nan": 0}))
+    df["Home Owner"] = (df["Home Owner"].astype(str).str.strip().str.lower()
+                        .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
+                             "0": 0, "": 0, "nan": 0}))
+    df["Fraud"] = (df["Fraud"].astype(str).str.strip().str.lower()
+                   .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
+                        "0": 0, "": 0, "nan": 0}))
 
     # Convert numerical columns to float
     print("Converting numerical columns...")
@@ -312,7 +315,9 @@ def train_sklearn_models(X_train, X_test, y_train, y_test):
     return clf, accuracy, report
 
 
-def train_neural_model(X_train, X_test, y_train, y_test, device, platform_type):
+def train_neural_model(X_train, X_test,
+                       y_train, y_test,
+                       device, platform_type):
     """Train and evaluate neural network model"""
     print("\nTraining Neural Network Model...")
 
@@ -491,7 +496,8 @@ def perform_clustering(X):
     return cluster_labels
 
 
-def plot_training_results(train_losses, val_losses, train_accs, val_accs, predictions, actual_labels):
+def plot_training_results(train_losses, val_losses, train_accs,
+                          val_accs, predictions, actual_labels):
     """Plot training curves and confusion matrix"""
     print("Generating training plots...")
 
