@@ -248,6 +248,11 @@ def main():
     torch.manual_seed(42)
     np.random.seed(42)
 
+    # Create results directory if it doesn't exist
+    results_dir = os.path.join(os.getcwd(), "results", "art")
+    os.makedirs(results_dir, exist_ok=True)
+    print(f"Results will be saved to {results_dir}")
+
     # Configure device and platform specifics
     device, platform_type = setup_device()
 
@@ -399,7 +404,8 @@ def main():
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             patience_counter = 0
-            torch.save(model.state_dict(), "best_art_model.pth")
+            torch.save(model.state_dict(), os.path.join(
+                results_dir, "best_art_model.pth"))
             print(f"Saved new best model with validation accuracy: {
                   val_acc:.2f}%")
         else:
@@ -414,7 +420,8 @@ def main():
     print(f"Training completed in {total_time/60:.2f} minutes")
 
     # Load best model for final evaluation
-    model.load_state_dict(torch.load("best_art_model.pth"))
+    model.load_state_dict(torch.load(
+        os.path.join(results_dir, "best_art_model.pth")))
 
     # Final evaluation
     print("Performing final evaluation...")
@@ -467,13 +474,16 @@ def main():
     plt.yticks(rotation=45)
 
     plt.tight_layout()
-    plt.savefig("training_results.png", dpi=300)
+    plt.savefig(os.path.join(results_dir, "training_results.png"), dpi=300)
     plt.show()
 
     # Save the final model
-    torch.save(model.state_dict(), "final_art_model.pth")
-    print("Final model saved to final_art_model.pth")
-    print("Training results saved to training_results.png")
+    torch.save(model.state_dict(), os.path.join(
+        results_dir, "final_art_model.pth"))
+    print(f"Final model saved to {os.path.join(
+        results_dir, 'final_art_model.pth')}")
+    print(f"Training results saved to {
+          os.path.join(results_dir, 'training_results.png')}")
 
 
 if __name__ == '__main__':
