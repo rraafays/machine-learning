@@ -569,16 +569,22 @@ Examples:
   ./fraud_detection.py
 
   # Make a prediction using an existing model
-  ./fraud_detection.py --predict --income 50000 --balance 10000 --age 35
-        --gender M --area "Urban" --education "Bachelor" --colour "Blue"
-        --employed Y --homeowner N
-''')
+  ./fraud_detection.py --predict \\
+                          --income 50000 \\
+                          --balance 10000 \\
+                          --age 35 \\
+                          --gender M \\
+                          --area "Urban" \\
+                          --education "University" \\
+                          --colour "Blue" \\
+                          --employed Y \\
+                          --homeowner N
+        ''')
 
-    # Create argument groups for better organization
+    parser.add_argument('--predict', action='store_true',
+                        help='Run in prediction mode using trained model')
+
     pred_group = parser.add_argument_group('Prediction options')
-
-    pred_group.add_argument('--predict', action='store_true',
-                            help='Run in prediction mode using trained model')
     pred_group.add_argument('--income', type=float,
                             help='Income value (numeric, e.g. 50000)')
     pred_group.add_argument('--balance', type=float,
