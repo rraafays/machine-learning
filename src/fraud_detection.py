@@ -83,6 +83,108 @@ class FraudDataset(Dataset):
         return self.X[idx]
 
 
+def setup_device():
+    system = platform.system()
+    print(f"Detected operating system: {system}")
+
+    if (system == "Darwin" and
+            hasattr(torch.backends, 'mps') and
+            torch.backends.mps.is_available()):
+        print("Apple Silicon detected - using MPS backend")
+        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+        return torch.device("mps"), "apple_silicon"
+
+    elif torch.cuda.is_available():
+        cuda_device_count = torch.cuda.device_count()
+        cuda_device_name = torch.cuda.get_device_name(0)
+        print(
+            f"NVIDIA GPU detected - using CUDA "
+            f"({cuda_device_name}, {cuda_device_count} device(s))")
+        return torch.device("cuda"), "nvidia"
+
+    else:
+        print("No GPU acceleration available - using CPU")
+        return torch.device("cpu"), "cpu"
+
+
+def clean_data(df):
+    print("Cleaning and preprocessing the data...")
+
+    df = df.drop(columns=["Unnamed: 10"], errors="ignore")
+
+    print("Converting binary fields to numerical values...")
+    df["Employed"] = (df["Employed"].astype(str).str.strip().str.lower()
+                      .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
+                           "0": 0, "": 0, "nan": 0}))
+    df["Home Owner"] = (df["Home Owner"].astype(str).str.strip().str.lower()
+                        .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
+                             "0": 0, "": 0, "nan": 0}))
+    df["Fraud"] = (df["Fraud"].astype(str).str.strip().str.lower()
+                   .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
+                        "0": 0, "": 0, "nan": 0}))
+
+    print("Converting numerical columns...")
+    df["Income"] = pd.to_numeric(df["Income"], errors='coerce')
+    df["Balance"] = pd.to_numeric(df["Balance"], errors='coerce')
+    df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
+
+    print("Handling missing values...")
+    df["Income"] = df["Income"].fillna(df["Income"].median())
+    df["Balance"] = df["Balance"].fillna(df["Balance"].median())
+    df["Age"] = df["Age"].fillna(df["Age"].median())
+
+    print("Encoding categorical variables...")
+    label_encoders = {}
+    for col in ["Gender", "Area", "Education", "Colour"]:
+        le = LabelEncoder()
+        df[col] = df[col].astype(str).str.strip()
+        df[col] = le.fit_transform(df[col])
+        label_encoders[col] = le
+
+    return df, label_encoders
+
+
+def normalize_features(df):
+    print("Normalizing numerical features...")
+    scaler = MinMaxScaler()
+    df[["Income", "Balance", "Age"]] = scaler.fit_transform(
+        df[["Income", "Balance", "Age"]])
+    return df, scaler
+
+
+def plot_distributions(df, output_dir):
+    print("Generating distribution plots...")
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    sns.histplot(df["Income"], bins=30, ax=axes[0],
+                 kde=True).set(title="Income Distribution")
+    sns.histplot(df["Balance"], bins=30, ax=axes[1],
+                 kde=True).set(title="Balance Distribution")
+    sns.histplot(df["Age"], bins=30, ax=axes[2],
+                 kde=True).set(title="Age Distribution")
+
+    plt.tight_layout()
+    output_path = os.path.join(output_dir, "feature_distributions.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Feature distributions saved to {output_path}")
+
+
+def plot_correlation_matrix(df, output_dir):
+    print("Generating correlation matrix...")
+
+    plt.figure(figsize=(12, 10))
+    corr = df.corr()
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+    sns.heatmap(corr, mask=mask, annot=True, cmap="coolwarm", fmt=".2f",
+                linewidths=0.5, cbar_kws={"shrink": .8})
+    plt.title("Feature Correlation Matrix")
+
+    plt.tight_layout()
+    output_path = os.path.join(output_dir, "correlation_matrix.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Correlation matrix saved to {output_path}")
+
+
 def train_epoch(model, train_loader, optimizer, criterion, device):
     model.train()
     running_loss = 0.0
@@ -153,115 +255,7 @@ def validate(model, val_loader, criterion, device):
     return avg_loss, accuracy, all_preds, all_labels
 
 
-def setup_device():
-    """Set up the appropriate device based on the platform"""
-    system = platform.system()
-    print(f"Detected operating system: {system}")
-
-    if (system == "Darwin" and
-            hasattr(torch.backends, 'mps') and
-            torch.backends.mps.is_available()):
-        print("Apple Silicon detected - using MPS backend")
-        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-        return torch.device("mps"), "apple_silicon"
-
-    elif torch.cuda.is_available():
-        cuda_device_count = torch.cuda.device_count()
-        cuda_device_name = torch.cuda.get_device_name(0)
-        print(
-            f"NVIDIA GPU detected - using CUDA "
-            f"({cuda_device_name}, {cuda_device_count} device(s))")
-        return torch.device("cuda"), "nvidia"
-
-    else:
-        print("No GPU acceleration available - using CPU")
-        return torch.device("cpu"), "cpu"
-
-
-def clean_data(df):
-    """Clean and preprocess the data"""
-    print("Cleaning and preprocessing the data...")
-
-    df = df.drop(columns=["Unnamed: 10"], errors="ignore")
-
-    print("Converting binary fields to numerical values...")
-    df["Employed"] = (df["Employed"].astype(str).str.strip().str.lower()
-                      .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
-                           "0": 0, "": 0, "nan": 0}))
-    df["Home Owner"] = (df["Home Owner"].astype(str).str.strip().str.lower()
-                        .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
-                             "0": 0, "": 0, "nan": 0}))
-    df["Fraud"] = (df["Fraud"].astype(str).str.strip().str.lower()
-                   .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
-                        "0": 0, "": 0, "nan": 0}))
-
-    print("Converting numerical columns...")
-    df["Income"] = pd.to_numeric(df["Income"], errors='coerce')
-    df["Balance"] = pd.to_numeric(df["Balance"], errors='coerce')
-    df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
-
-    print("Handling missing values...")
-    df["Income"] = df["Income"].fillna(df["Income"].median())
-    df["Balance"] = df["Balance"].fillna(df["Balance"].median())
-    df["Age"] = df["Age"].fillna(df["Age"].median())
-
-    print("Encoding categorical variables...")
-    label_encoders = {}
-    for col in ["Gender", "Area", "Education", "Colour"]:
-        le = LabelEncoder()
-        df[col] = df[col].astype(str).str.strip()
-        df[col] = le.fit_transform(df[col])
-        label_encoders[col] = le
-
-    return df, label_encoders
-
-
-def normalize_features(df):
-    """Normalize numerical features"""
-    print("Normalizing numerical features...")
-    scaler = MinMaxScaler()
-    df[["Income", "Balance", "Age"]] = scaler.fit_transform(
-        df[["Income", "Balance", "Age"]])
-    return df, scaler
-
-
-def plot_distributions(df, output_dir):
-    """Plot distributions of key numerical features"""
-    print("Generating distribution plots...")
-
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-    sns.histplot(df["Income"], bins=30, ax=axes[0],
-                 kde=True).set(title="Income Distribution")
-    sns.histplot(df["Balance"], bins=30, ax=axes[1],
-                 kde=True).set(title="Balance Distribution")
-    sns.histplot(df["Age"], bins=30, ax=axes[2],
-                 kde=True).set(title="Age Distribution")
-
-    plt.tight_layout()
-    output_path = os.path.join(output_dir, "feature_distributions.png")
-    plt.savefig(output_path, dpi=300)
-    print(f"Feature distributions saved to {output_path}")
-
-
-def plot_correlation_matrix(df, output_dir):
-    """Plot correlation matrix of features"""
-    print("Generating correlation matrix...")
-
-    plt.figure(figsize=(12, 10))
-    corr = df.corr()
-    mask = np.triu(np.ones_like(corr, dtype=bool))
-    sns.heatmap(corr, mask=mask, annot=True, cmap="coolwarm", fmt=".2f",
-                linewidths=0.5, cbar_kws={"shrink": .8})
-    plt.title("Feature Correlation Matrix")
-
-    plt.tight_layout()
-    output_path = os.path.join(output_dir, "correlation_matrix.png")
-    plt.savefig(output_path, dpi=300)
-    print(f"Correlation matrix saved to {output_path}")
-
-
 def train_sklearn_models(X_train, X_test, y_train, y_test, output_dir):
-    """Train and evaluate sklearn models"""
     print("Training Random Forest Classifier...")
 
     rf_params = {
@@ -300,7 +294,6 @@ def train_sklearn_models(X_train, X_test, y_train, y_test, output_dir):
 def train_neural_model(X_train, X_test,
                        y_train, y_test,
                        device, platform_type, output_dir):
-    """Train and evaluate neural network model"""
     print("\nTraining Neural Network Model...")
 
     torch.manual_seed(42)
@@ -417,8 +410,6 @@ def train_neural_model(X_train, X_test,
 
 
 def perform_clustering(X, output_dir):
-    """Perform K-means clustering and visualize results
-    on features without the target variable"""
     print("\nPerforming K-means clustering...")
 
     scaler = StandardScaler()
@@ -463,7 +454,6 @@ def perform_clustering(X, output_dir):
 def plot_training_results(train_losses, val_losses, train_accs,
                           val_accs, predictions,
                           actual_labels, output_dir):
-    """Plot training curves and confusion matrix"""
     print("Generating training plots...")
 
     plt.figure(figsize=(15, 10))
@@ -511,7 +501,6 @@ def plot_training_results(train_losses, val_losses, train_accs,
 
 
 def parse_arguments():
-    """Parse command line arguments"""
     parser = argparse.ArgumentParser(
         description='Fraud Detection System',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -560,7 +549,6 @@ Examples:
 
 
 def predict_fraud(args, model_path, label_encoders, scaler, device):
-    """Make fraud prediction using saved model"""
     input_dim = 9
     model = FraudClassifier(input_dim).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
