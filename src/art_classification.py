@@ -9,6 +9,8 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from tqdm.auto import tqdm
 import multiprocessing
+import argparse
+from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -243,7 +245,89 @@ def setup_device():
         return torch.device("cpu"), "cpu"
 
 
+def classify_image(image_path, model_path, device, classes):
+    """Classify a single image using a trained model"""
+    print(f"Classifying image: {image_path}")
+
+    # Check if model exists
+    if not os.path.exists(model_path):
+        print(f"Error: Model file {
+              model_path} not found. Please train the model first.")
+        return
+
+    # Load the model
+    print("Loading model...")
+    num_classes = len(classes)
+    model = OptimizedArtCNN(num_classes).to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
+
+    # Prepare image transforms - same as validation transform
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
+                             0.229, 0.224, 0.225])
+    ])
+
+    try:
+        # Open and transform the image
+        image = Image.open(image_path)
+
+        # Handle transparency similar to SafeImageFolder
+        if image.mode == 'P' and 'transparency' in image.info:
+            image = image.convert('RGBA')
+        elif image.mode == 'L' and 'transparency' in image.info:
+            image = image.convert('RGBA')
+
+        # Convert RGBA to RGB if needed
+        if image.mode == 'RGBA':
+            background = Image.new('RGB', image.size, (255, 255, 255))
+            background.paste(image, mask=image.split()[3])
+            image = background
+
+        # Apply transforms and add batch dimension
+        image_tensor = transform(image).unsqueeze(0).to(device)
+
+        # Get prediction
+        with torch.no_grad():
+            outputs = model(image_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)[0]
+            _, predicted_idx = torch.max(outputs, 1)
+            predicted_class = classes[predicted_idx.item()]
+            confidence = probabilities[predicted_idx.item()].item() * 100
+
+        print(f"\nPrediction: {
+              predicted_class} (Confidence: {confidence:.2f}%)")
+
+        # Show top 3 predictions if there are enough classes
+        if len(classes) > 2:
+            top_k = min(3, len(classes))
+            top_probs, top_idx = torch.topk(probabilities, top_k)
+            print("\nTop predictions:")
+            for i in range(top_k):
+                print(f"  {classes[top_idx[i].item()]}: {
+                      top_probs[i].item()*100:.2f}%")
+
+        # Optionally display the image
+        plt.figure(figsize=(6, 6))
+        plt.imshow(np.array(image))
+        plt.title(f"Prediction: {predicted_class} ({confidence:.2f}%)")
+        plt.axis('off')
+        plt.tight_layout()
+        plt.show()
+
+    except Exception as e:
+        print(f"Error processing image: {str(e)}")
+
+
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Art Classification')
+    parser.add_argument('--image', type=str,
+                        help='Path to an image for classification')
+    args = parser.parse_args()
+
     # Set random seeds for reproducibility
     torch.manual_seed(42)
     np.random.seed(42)
@@ -256,6 +340,26 @@ def main():
     # Configure device and platform specifics
     device, platform_type = setup_device()
 
+    # Path to the model
+    model_path = os.path.join(results_dir, "best_art_model.pth")
+
+    # If image path is provided, classify the image
+    if args.image:
+        # Need to get the classes from the dataset
+        path = kagglehub.dataset_download(
+            "thedownhill/art-images-drawings-painting-sculpture-engraving")
+        path = path + "/dataset/dataset_updated"
+        train_set = os.path.join(path, "training_set")
+
+        # We only need to get the class names without loading the full dataset
+        temp_dataset = torchvision.datasets.ImageFolder(root=train_set)
+        classes = temp_dataset.classes
+
+        # Classify the image
+        classify_image(args.image, model_path, device, classes)
+        return
+
+    # Otherwise, run the training process
     # Performance optimizations
     if platform_type == "nvidia":
         torch.backends.cudnn.deterministic = False  # For performance
