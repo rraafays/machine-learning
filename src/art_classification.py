@@ -323,7 +323,17 @@ def classify_image(image_path, model_path, device, classes):
 
 def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Art Classification')
+    parser = argparse.ArgumentParser(
+        description='Art Classification System',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Train model
+  ./art_classification.py
+
+  # Classify an image using an existing model
+  ./art_classification.py --image ~/path/to/image
+        ''')
     parser.add_argument('--image', type=str,
                         help='Path to an image for classification')
     args = parser.parse_args()
