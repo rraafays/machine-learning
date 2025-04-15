@@ -242,7 +242,7 @@ def normalize_features(df):
     return df, scaler
 
 
-def plot_distributions(df):
+def plot_distributions(df, output_dir):
     """Plot distributions of key numerical features"""
     print("Generating distribution plots...")
 
@@ -255,11 +255,12 @@ def plot_distributions(df):
                  kde=True).set(title="Age Distribution")
 
     plt.tight_layout()
-    plt.savefig("feature_distributions.png", dpi=300)
-    print("Feature distributions saved to feature_distributions.png")
+    output_path = os.path.join(output_dir, "feature_distributions.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Feature distributions saved to {output_path}")
 
 
-def plot_correlation_matrix(df):
+def plot_correlation_matrix(df, output_dir):
     """Plot correlation matrix of features"""
     print("Generating correlation matrix...")
 
@@ -271,11 +272,12 @@ def plot_correlation_matrix(df):
     plt.title("Feature Correlation Matrix")
 
     plt.tight_layout()
-    plt.savefig("correlation_matrix.png", dpi=300)
-    print("Correlation matrix saved to correlation_matrix.png")
+    output_path = os.path.join(output_dir, "correlation_matrix.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Correlation matrix saved to {output_path}")
 
 
-def train_sklearn_models(X_train, X_test, y_train, y_test):
+def train_sklearn_models(X_train, X_test, y_train, y_test, output_dir):
     """Train and evaluate sklearn models"""
     print("Training Random Forest Classifier...")
 
@@ -309,15 +311,16 @@ def train_sklearn_models(X_train, X_test, y_train, y_test):
     sns.barplot(x=feature_imp.values, y=feature_imp.index)
     plt.title('Feature Importance in Random Forest Model')
     plt.tight_layout()
-    plt.savefig("feature_importance.png", dpi=300)
-    print("Feature importance plot saved to feature_importance.png")
+    output_path = os.path.join(output_dir, "feature_importance.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Feature importance plot saved to {output_path}")
 
     return clf, accuracy, report
 
 
 def train_neural_model(X_train, X_test,
                        y_train, y_test,
-                       device, platform_type):
+                       device, platform_type, output_dir):
     """Train and evaluate neural network model"""
     print("\nTraining Neural Network Model...")
 
@@ -417,7 +420,8 @@ def train_neural_model(X_train, X_test,
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             patience_counter = 0
-            torch.save(model.state_dict(), "best_fraud_model.pth")
+            model_path = os.path.join(output_dir, "best_fraud_model.pth")
+            torch.save(model.state_dict(), model_path)
             print(f"Saved new best model with validation accuracy: {
                   val_acc:.2f}%")
         else:
@@ -432,7 +436,8 @@ def train_neural_model(X_train, X_test,
     print(f"Training completed in {total_time/60:.2f} minutes")
 
     # Load best model for final evaluation
-    model.load_state_dict(torch.load("best_fraud_model.pth"))
+    model_path = os.path.join(output_dir, "best_fraud_model.pth")
+    model.load_state_dict(torch.load(model_path))
 
     # Final evaluation
     print("Performing final evaluation...")
@@ -442,12 +447,13 @@ def train_neural_model(X_train, X_test,
 
     # Plot training curves
     plot_training_results(train_losses, val_losses,
-                          train_accs, val_accs, predictions, actual_labels)
+                          train_accs, val_accs, predictions,
+                          actual_labels, output_dir)
 
     return model, final_acc
 
 
-def perform_clustering(X):
+def perform_clustering(X, output_dir):
     """Perform K-means clustering and visualize results
     on features without the target variable"""
     print("\nPerforming K-means clustering...")
@@ -490,14 +496,16 @@ def perform_clustering(X):
     plt.xlabel('Principal Component 1')
     plt.ylabel('Principal Component 2')
     plt.tight_layout()
-    plt.savefig("clustering_results.png", dpi=300)
-    print("Clustering visualization saved to clustering_results.png")
+    output_path = os.path.join(output_dir, "clustering_results.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Clustering visualization saved to {output_path}")
 
     return cluster_labels
 
 
 def plot_training_results(train_losses, val_losses, train_accs,
-                          val_accs, predictions, actual_labels):
+                          val_accs, predictions,
+                          actual_labels, output_dir):
     """Plot training curves and confusion matrix"""
     print("Generating training plots...")
 
@@ -544,14 +552,21 @@ def plot_training_results(train_losses, val_losses, train_accs,
     plt.legend(loc="lower right")
 
     plt.tight_layout()
-    plt.savefig("training_results.png", dpi=300)
-    print("Training results saved to training_results.png")
+    output_path = os.path.join(output_dir, "training_results.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Training results saved to {output_path}")
 
 
 def main():
     # Set random seeds for reproducibility
     torch.manual_seed(42)
     np.random.seed(42)
+
+    # Create output directory
+    output_dir = os.path.join("results", "fraud")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created output directory: {output_dir}")
 
     # Configure device and platform specifics
     device, platform_type = setup_device()
@@ -578,8 +593,8 @@ def main():
     print(df.head())
 
     # Plot data distributions
-    plot_distributions(df)
-    plot_correlation_matrix(df)
+    plot_distributions(df, output_dir)
+    plot_correlation_matrix(df, output_dir)
 
     # Prepare data for modeling
     print("\nPreparing data for modeling...")
@@ -595,14 +610,14 @@ def main():
 
     # Train sklearn models
     rf_model, rf_accuracy, rf_report = train_sklearn_models(
-        X_train, X_test, y_train, y_test)
+        X_train, X_test, y_train, y_test, output_dir)
 
     # Train neural network
     nn_model, nn_accuracy = train_neural_model(
-        X_train, X_test, y_train, y_test, device, platform_type)
+        X_train, X_test, y_train, y_test, device, platform_type, output_dir)
 
     # Perform clustering analysis
-    cluster_labels = perform_clustering(X)
+    cluster_labels = perform_clustering(X, output_dir)
     # Add cluster labels to dataframe for further analysis
     df['Cluster'] = cluster_labels
 
@@ -611,12 +626,13 @@ def main():
     print(f"Random Forest Accuracy: {rf_accuracy:.4f}")
     print(f"Neural Network Accuracy: {nn_accuracy:.2f}%")
     print("\nTraining visualizations saved to:")
-    print("- feature_distributions.png")
-    print("- correlation_matrix.png")
-    print("- feature_importance.png")
-    print("- training_results.png")
-    print("- clustering_results.png")
-    print("\nBest model saved to best_fraud_model.pth")
+    print(f" {os.path.join(output_dir, 'feature_distributions.png')}")
+    print(f" {os.path.join(output_dir, 'correlation_matrix.png')}")
+    print(f" {os.path.join(output_dir, 'feature_importance.png')}")
+    print(f" {os.path.join(output_dir, 'training_results.png')}")
+    print(f" {os.path.join(output_dir, 'clustering_results.png')}")
+    print(f"\nBest model saved to {os.path.join(
+        output_dir, 'best_fraud_model.pth')}")
 
 
 if __name__ == '__main__':

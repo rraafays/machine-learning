@@ -1,5 +1,4 @@
 .envrc
 .venv/
 **/.ipynb_checkpoints/
-src/*.pth
-src/*.png
+src/results/
