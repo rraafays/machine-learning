@@ -9,6 +9,7 @@ import seaborn as sns
 from tqdm.auto import tqdm
 import multiprocessing
 import pandas as pd
+import argparse
 from sklearn.preprocessing import (
     MinMaxScaler,
     LabelEncoder,
@@ -557,7 +558,100 @@ def plot_training_results(train_losses, val_losses, train_accs,
     print(f"Training results saved to {output_path}")
 
 
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description='Fraud Detection System',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Train model
+  ./fraud_detection.py
+
+  # Make a prediction using an existing model
+  ./fraud_detection.py --predict --income 50000 --balance 10000 --age 35
+        --gender M --area "Urban" --education "Bachelor" --colour "Blue"
+        --employed Y --homeowner N
+''')
+
+    # Create argument groups for better organization
+    pred_group = parser.add_argument_group('Prediction options')
+
+    pred_group.add_argument('--predict', action='store_true',
+                            help='Run in prediction mode using trained model')
+    pred_group.add_argument('--income', type=float,
+                            help='Income value (numeric, e.g. 50000)')
+    pred_group.add_argument('--balance', type=float,
+                            help='Account balance (numeric, e.g. 10000)')
+    pred_group.add_argument('--age', type=int,
+                            help='Age (integer, e.g. 35)')
+    pred_group.add_argument('--gender', type=str,
+                            help='Gender (M/F)')
+    pred_group.add_argument('--area', type=str,
+                            help='Area/Region (e.g. Urban, Rural, Suburban)')
+    pred_group.add_argument('--education', type=str,
+                            help='Education level (e.g. University, School)')
+    pred_group.add_argument('--colour', type=str,
+                            help='Color preference (e.g. Blue, Red, Green)')
+    pred_group.add_argument('--employed', type=str,
+                            help='Employment status (Y/N)')
+    pred_group.add_argument('--homeowner', type=str,
+                            help='Home ownership status (Y/N)')
+
+    return parser.parse_args()
+
+
+def predict_fraud(args, model_path, label_encoders, scaler, device):
+    """Make fraud prediction using saved model"""
+    # Load the model
+    input_dim = 9  # Number of features
+    model = FraudClassifier(input_dim).to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
+
+    # Prepare input data
+    data = {
+        'Income': [args.income],
+        'Balance': [args.balance],
+        'Age': [args.age],
+        'Gender': [args.gender],
+        'Area': [args.area],
+        'Education': [args.education],
+        'Colour': [args.colour],
+        'Employed': [1 if args.employed.lower() in ['y', 'yes', '1'] else 0],
+        'Home Owner': [1 if args.homeowner.lower() in ['y', 'yes', '1'] else 0]
+    }
+
+    # Create dataframe
+    input_df = pd.DataFrame(data)
+
+    # Handle categorical encoding
+    for col, encoder in label_encoders.items():
+        input_df[col] = encoder.transform(
+            input_df[col].astype(str).str.strip())
+
+    # Normalize numerical features
+    input_df[["Income", "Balance", "Age"]] = scaler.transform(
+        input_df[["Income", "Balance", "Age"]])
+
+    # Convert to tensor
+    input_tensor = torch.FloatTensor(input_df.values).to(device)
+
+    # Make prediction
+    with torch.no_grad():
+        output = model(input_tensor)
+
+    # Get probability and decision
+    probability = output.item() * 100  # Convert to percentage
+    is_fraud = output.item() > 0.5
+
+    return is_fraud, probability
+
+
 def main():
+    # Parse arguments
+    args = parse_arguments()
+
     # Set random seeds for reproducibility
     torch.manual_seed(42)
     np.random.seed(42)
@@ -571,68 +665,109 @@ def main():
     # Configure device and platform specifics
     device, platform_type = setup_device()
 
-    # Performance optimizations
-    if platform_type == "nvidia":
-        torch.backends.cudnn.deterministic = False  # For performance
-        torch.backends.cudnn.benchmark = True       # For performance
+    # Check if in prediction mode
+    if args.predict:
+        # Check if all required arguments are provided
+        required_args = ['income', 'balance', 'age', 'gender', 'area',
+                         'education', 'colour', 'employed', 'homeowner']
+        missing_args = [
+            arg for arg in required_args if getattr(args, arg) is None]
 
-    # Load dataset
-    print("\nLoading dataset...")
-    file_path = "./cwdata.csv"
-    df = pd.read_csv(file_path)
-    print(f"Loaded dataset with {df.shape[0]} rows and {df.shape[1]} columns")
-    print("First few rows of the dataset:")
-    print(df.head())
+        if missing_args:
+            print(f"Error: Missing required arguments: {
+                  ', '.join(missing_args)}")
+            return
 
-    # Clean and preprocess data
-    df, label_encoders = clean_data(df)
-    df, scaler = normalize_features(df)
+        # Load dataset to get label encoders and scaler
+        print("\nLoading dataset for encoders and scalers...")
+        file_path = "./cwdata.csv"
+        df = pd.read_csv(file_path)
+        df, label_encoders = clean_data(df)
+        df, scaler = normalize_features(df)
 
-    # Display processed data
-    print("\nProcessed dataset:")
-    print(df.head())
+        # Load model and make prediction
+        model_path = os.path.join(output_dir, "best_fraud_model.pth")
+        if not os.path.exists(model_path):
+            print(f"Error: Model file {
+                  model_path} not found. Train the model first.")
+            return
 
-    # Plot data distributions
-    plot_distributions(df, output_dir)
-    plot_correlation_matrix(df, output_dir)
+        print("\nMaking fraud prediction...")
+        is_fraud, probability = predict_fraud(
+            args, model_path, label_encoders, scaler, device)
 
-    # Prepare data for modeling
-    print("\nPreparing data for modeling...")
-    X = df.drop(columns=["Fraud"])
-    y = df["Fraud"]
+        print("\n=== Fraud Prediction Results ===")
+        print(f"Fraud detected: {'Yes' if is_fraud else 'No'}")
+        if is_fraud:
+            print(f"Confidence: {probability:.2f}%")
+        else:
+            print(f"Confidence: {100-probability:.2f}%")
 
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y)
+    else:
+        # Performance optimizations
+        if platform_type == "nvidia":
+            torch.backends.cudnn.deterministic = False  # For performance
+            torch.backends.cudnn.benchmark = True       # For performance
 
-    print(f"Training set: {X_train.shape[0]} samples")
-    print(f"Testing set: {X_test.shape[0]} samples")
+        # Load dataset
+        print("\nLoading dataset...")
+        file_path = "./cwdata.csv"
+        df = pd.read_csv(file_path)
+        print(f"Loaded dataset with {
+              df.shape[0]} rows and {df.shape[1]} columns")
+        print("First few rows of the dataset:")
+        print(df.head())
 
-    # Train sklearn models
-    rf_model, rf_accuracy, rf_report = train_sklearn_models(
-        X_train, X_test, y_train, y_test, output_dir)
+        # Clean and preprocess data
+        df, label_encoders = clean_data(df)
+        df, scaler = normalize_features(df)
 
-    # Train neural network
-    nn_model, nn_accuracy = train_neural_model(
-        X_train, X_test, y_train, y_test, device, platform_type, output_dir)
+        # Display processed data
+        print("\nProcessed dataset:")
+        print(df.head())
 
-    # Perform clustering analysis
-    cluster_labels = perform_clustering(X, output_dir)
-    # Add cluster labels to dataframe for further analysis
-    df['Cluster'] = cluster_labels
+        # Plot data distributions
+        plot_distributions(df, output_dir)
+        plot_correlation_matrix(df, output_dir)
 
-    # Final summary
-    print("\n=== Final Results ===")
-    print(f"Random Forest Accuracy: {rf_accuracy:.4f}")
-    print(f"Neural Network Accuracy: {nn_accuracy:.2f}%")
-    print("\nTraining visualizations saved to:")
-    print(f" {os.path.join(output_dir, 'feature_distributions.png')}")
-    print(f" {os.path.join(output_dir, 'correlation_matrix.png')}")
-    print(f" {os.path.join(output_dir, 'feature_importance.png')}")
-    print(f" {os.path.join(output_dir, 'training_results.png')}")
-    print(f" {os.path.join(output_dir, 'clustering_results.png')}")
-    print(f"\nBest model saved to {os.path.join(
-        output_dir, 'best_fraud_model.pth')}")
+        # Prepare data for modeling
+        print("\nPreparing data for modeling...")
+        X = df.drop(columns=["Fraud"])
+        y = df["Fraud"]
+
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y)
+
+        print(f"Training set: {X_train.shape[0]} samples")
+        print(f"Testing set: {X_test.shape[0]} samples")
+
+        # Train sklearn models
+        rf_model, rf_accuracy, rf_report = train_sklearn_models(
+            X_train, X_test, y_train, y_test, output_dir)
+
+        # Train neural network
+        nn_model, nn_accuracy = train_neural_model(
+            X_train, X_test, y_train, y_test,
+            device, platform_type, output_dir)
+
+        # Perform clustering analysis
+        cluster_labels = perform_clustering(X, output_dir)
+        # Add cluster labels to dataframe for further analysis
+        df['Cluster'] = cluster_labels
+
+        # Final summary
+        print("\n=== Final Results ===")
+        print(f"Random Forest Accuracy: {rf_accuracy:.4f}")
+        print(f"Neural Network Accuracy: {nn_accuracy:.2f}%")
+        print("\nTraining visualizations saved to:")
+        print(f" {os.path.join(output_dir, 'feature_distributions.png')}")
+        print(f" {os.path.join(output_dir, 'correlation_matrix.png')}")
+        print(f" {os.path.join(output_dir, 'feature_importance.png')}")
+        print(f" {os.path.join(output_dir, 'training_results.png')}")
+        print(f" {os.path.join(output_dir, 'clustering_results.png')}")
+        print(f"\nBest model saved to {os.path.join(
+            output_dir, 'best_fraud_model.pth')}")
 
 
 if __name__ == '__main__':
