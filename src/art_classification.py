@@ -475,7 +475,6 @@ def main():
 
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, "training_results.png"), dpi=300)
-    plt.show()
 
     # Save the final model
     torch.save(model.state_dict(), os.path.join(
