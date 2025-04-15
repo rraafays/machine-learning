@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 
-import os
-import time
-import platform
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import confusion_matrix
-from tqdm.auto import tqdm
-import multiprocessing
 import argparse
-from PIL import Image
+import kagglehub
+import matplotlib.pyplot as plt
+import multiprocessing
+import numpy as np
+import os
+import platform
+import seaborn as sns
+import time
+import torchvision
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
-import torchvision
-import torchvision.transforms as transforms
 
-import kagglehub
+from PIL import Image
+from sklearn.metrics import confusion_matrix
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from tqdm.auto import tqdm
 
 
 class SafeImageFolder(torchvision.datasets.ImageFolder):

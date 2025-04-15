@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 
-import os
-import time
-import platform
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from tqdm.auto import tqdm
-import multiprocessing
-import pandas as pd
 import argparse
-from sklearn.preprocessing import (
-    MinMaxScaler,
-    LabelEncoder,
-    StandardScaler
-)
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import (RandomForestClassifier)
+import matplotlib.pyplot as plt
+import multiprocessing
+import numpy as np
+import os
+import pandas as pd
+import platform
+import seaborn as sns
+import time
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+from tqdm.auto import tqdm
+
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -24,13 +26,19 @@ from sklearn.metrics import (
     roc_curve,
     auc
 )
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, TensorDataset
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    LabelEncoder,
+    StandardScaler
+)
+
+from torch.utils.data import (
+    Dataset,
+    DataLoader,
+    TensorDataset
+)
 
 
 class FraudClassifier(nn.Module):
