@@ -40,6 +40,31 @@ from torch.utils.data import (
     TensorDataset
 )
 
+# ----------------------------------------------------------------------------
+# NEURAL NETWORK MODEL DEFINITION
+# ----------------------------------------------------------------------------
+# This neural network uses a simple but effective approach for classification:
+# - Multiple dense layers with progressively decreasing sizes to extract
+#   hierarchical features
+# - BatchNorm layers to stabilize and accelerate training by normalizing
+#   activations
+# - ReLU activations to introduce non-linearity without vanishing gradient
+#   issues
+# - Dropout for regularization to prevent overfitting
+# - Kaiming initialization to set appropriate initial weights for ReLU
+#   activations
+#
+# Alternatives considered:
+# 1. More complex architectures (e.g., residual connections) - avoided for
+#    simplicity and to prevent overfitting on this relatively small dataset
+# 2. Different activation functions (e.g., LeakyReLU, SELU) - standard ReLU
+#    chosen for its effectiveness and computational efficiency
+# 3. No hidden layers - would limit the model's ability to learn complex
+#    patterns
+# 4. More hidden layers - could lead to overfitting and diminishing returns
+# 5. Different weight initialization schemes - Kaiming chosen as it's optimal
+#    for ReLU networks
+
 
 class FraudClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim=64, dropout_rate=0.3):
@@ -76,6 +101,25 @@ class FraudClassifier(nn.Module):
     def forward(self, x):
         return self.model(x)
 
+# ----------------------------------------------------------------------------
+# CUSTOM DATASET CLASS
+# ----------------------------------------------------------------------------
+# This dataset class provides a clean interface for PyTorch to access the data.
+# It converts data to tensors and handles the optional target variable for
+# unsupervised scenarios.
+#
+# Benefits of custom Dataset class:
+# 1. Enables efficient batch processing through DataLoader
+# 2. Abstracts data access logic from model training code
+# 3. Handles both supervised (with labels) and unsupervised (without labels)
+#    use cases
+# 4. Ensures proper tensor formatting required by PyTorch
+#
+# Alternatives considered:
+# 1. Using TensorDataset directly - less flexible for customization
+# 2. Using NumPy arrays directly - would require conversion at each batch
+# 3. Using pandas DataFrames directly - inefficient for deep learning
+
 
 class FraudDataset(Dataset):
     def __init__(self, X, y=None):
@@ -89,6 +133,26 @@ class FraudDataset(Dataset):
         if self.y is not None:
             return self.X[idx], self.y[idx]
         return self.X[idx]
+
+# ----------------------------------------------------------------------------
+# DEVICE DETECTION AND SETUP
+# ----------------------------------------------------------------------------
+# This function automatically detects and configures the optimal computational
+# device
+# for model training based on the user's hardware (Apple Silicon, NVIDIA GPU,
+# or CPU).
+#
+# Benefits:
+# 1. Cross-platform compatibility for maximum performance
+# 2. Hardware-specific optimizations (MPS for Apple, CUDA for NVIDIA)
+# 3. Graceful fallback to CPU when no GPU is available
+# 4. Enables acceleration without code changes when hardware changes
+#
+# Alternatives considered:
+# 1. Hardcoded device selection - would limit portability
+# 2. Manual device selection via arguments - adds complexity for users
+# 3. CPU-only implementation - would be significantly slower
+# 4. No explicit detection - would miss optimizations on Apple Silicon
 
 
 def setup_device():
@@ -114,6 +178,29 @@ def setup_device():
         print("No GPU acceleration available - using CPU")
         return torch.device("cpu"), "cpu"
 
+# ----------------------------------------------------------------------------
+# DATA CLEANING AND PREPROCESSING
+# ----------------------------------------------------------------------------
+# This function performs essential data preprocessing steps including:
+# - Handling missing values through imputation
+# - Converting categorical variables to numerical using encoding
+# - Standardizing variable formats and ranges
+#
+# Benefits:
+# 1. Ensures data quality for model training through systematic cleanup
+# 2. Uses domain-appropriate handling for different data types
+# 3. Provides consistent numerical representation for ML algorithms
+# 4. Returns encoders for later use in inference/prediction
+#
+# Alternatives considered:
+# 1. More complex imputation (e.g., KNN, iterative) - simpler median imputation
+#    chosen for balance of effectiveness and efficiency
+# 2. One-hot encoding - label encoding chosen for dimensionality control
+# 3. Dropping missing values - would reduce dataset size unnecessarily
+# 4. Feature engineering with interaction terms - avoided for initial modeling
+# 5. Non-parametric transformations - not needed for this dataset's
+#    distributions
+
 
 def clean_data(df):
     print("Cleaning and preprocessing the data...")
@@ -123,13 +210,13 @@ def clean_data(df):
     print("Converting binary fields to numerical values...")
     df["Employed"] = (df["Employed"].astype(str).str.strip().str.lower()
                       .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
-                           "0": 0, "": 0, "nan": 0}))
+                            "0": 0, "": 0, "nan": 0}))
     df["Home Owner"] = (df["Home Owner"].astype(str).str.strip().str.lower()
                         .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
-                             "0": 0, "": 0, "nan": 0}))
+                              "0": 0, "": 0, "nan": 0}))
     df["Fraud"] = (df["Fraud"].astype(str).str.strip().str.lower()
                    .map({"y": 1, "yes": 1, "n": 0, "no": 0, "1": 1,
-                        "0": 0, "": 0, "nan": 0}))
+                         "0": 0, "": 0, "nan": 0}))
 
     print("Converting numerical columns...")
     df["Income"] = pd.to_numeric(df["Income"], errors='coerce')
@@ -151,6 +238,24 @@ def clean_data(df):
 
     return df, label_encoders
 
+# ----------------------------------------------------------------------------
+# FEATURE NORMALIZATION
+# ----------------------------------------------------------------------------
+# Applies MinMaxScaler to numerical features to normalize them to [0,1] range.
+#
+# Benefits:
+# 1. Puts all numerical features on the same scale to prevent dominance
+# 2. Improves convergence speed for gradient-based optimization
+# 3. Necessary for neural networks to work effectively
+# 4. Preserves the shape of the original distribution
+#
+# Alternatives considered:
+# 1. StandardScaler (mean=0, std=1) - MinMaxScaler preferred for bounded [0,1]
+#    output
+# 2. RobustScaler - less sensitive to outliers but not necessary here
+# 3. No scaling - would harm model performance, especially neural networks
+# 4. Log transformation - not needed as distributions are not heavily skewed
+
 
 def normalize_features(df):
     print("Normalizing numerical features...")
@@ -158,6 +263,26 @@ def normalize_features(df):
     df[["Income", "Balance", "Age"]] = scaler.fit_transform(
         df[["Income", "Balance", "Age"]])
     return df, scaler
+
+# ----------------------------------------------------------------------------
+# DATA VISUALIZATION: DISTRIBUTIONS
+# ----------------------------------------------------------------------------
+# Creates histograms of the main numerical features to understand their
+# distributions.
+#
+# Benefits:
+# 1. Provides visual insight into data characteristics and distributions
+# 2. Helps identify potential issues (outliers, skewness) before modeling
+# 3. Supports feature engineering decisions
+# 4. Creates documentation artifacts for assessment and presentation
+#
+# Alternatives considered:
+# 1. Box plots - histograms chosen for better distribution visualization
+# 2. Violin plots - more complex and less intuitive for basic distribution
+#    analysis
+# 3. Interactive visualizations - static plots chosen for simplicity and
+#    compatibility
+# 4. No visualization - would miss important data insights
 
 
 def plot_distributions(df, output_dir):
@@ -176,6 +301,26 @@ def plot_distributions(df, output_dir):
     plt.savefig(output_path, dpi=300)
     print(f"Feature distributions saved to {output_path}")
 
+# ----------------------------------------------------------------------------
+# DATA VISUALIZATION: CORRELATION MATRIX
+# ----------------------------------------------------------------------------
+# Generates a heatmap of feature correlations to understand relationships
+# between variables.
+#
+# Benefits:
+# 1. Identifies multicollinearity between features that could affect model
+#    performance
+# 2. Reveals potential predictive relationships with the target variable
+# 3. Guides feature selection decisions
+# 4. Helps understand underlying data structure
+#
+# Alternatives considered:
+# 1. Pairwise scatter plots - too many for large feature sets
+# 2. Point-biserial correlation for categorical vars - simpler approach chosen
+# 3. VIF analysis - correlation matrix provides similar insights with better
+#    visualization
+# 4. No correlation analysis - would miss important feature relationships
+
 
 def plot_correlation_matrix(df, output_dir):
     print("Generating correlation matrix...")
@@ -191,6 +336,25 @@ def plot_correlation_matrix(df, output_dir):
     output_path = os.path.join(output_dir, "correlation_matrix.png")
     plt.savefig(output_path, dpi=300)
     print(f"Correlation matrix saved to {output_path}")
+
+# ----------------------------------------------------------------------------
+# NEURAL NETWORK TRAINING LOOP
+# ----------------------------------------------------------------------------
+# Single epoch training function for the neural network model with progress
+# tracking.
+#
+# Benefits:
+# 1. Encapsulates the training loop for cleaner code organization
+# 2. Provides real-time progress tracking and metrics with tqdm
+# 3. Calculates and returns key performance metrics
+# 4. Handles device-agnostic training (CPU/GPU/MPS)
+#
+# Alternatives considered:
+# 1. Using higher-level training frameworks (e.g., PyTorch Lightning) - custom
+#    implementation provides more control and educational value
+# 2. Integrating validation within training loop - separated for cleaner code
+# 3. Custom training schedule - simple epoch-based approach chosen for clarity
+# 4. Gradient accumulation - not needed for this dataset size
 
 
 def train_epoch(model, train_loader, optimizer, criterion, device):
@@ -224,6 +388,23 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
     accuracy = 100 * correct / total
 
     return avg_loss, accuracy
+
+# ----------------------------------------------------------------------------
+# NEURAL NETWORK VALIDATION
+# ----------------------------------------------------------------------------
+# Evaluates model performance on validation data without updating weights.
+#
+# Benefits:
+# 1. Provides unbiased evaluation of model performance during training
+# 2. Collects predictions for detailed performance analysis
+# 3. Uses torch.no_grad() for memory efficiency during inference
+# 4. Calculates metrics consistent with the training loop
+#
+# Alternatives considered:
+# 1. Simplified metrics - comprehensive metrics chosen for better evaluation
+# 2. Separate evaluation script - integrated for streamlined workflow
+# 3. Only final evaluation - progressive evaluation provides training insights
+# 4. Different threshold values - 0.5 is standard for binary classification
 
 
 def validate(model, val_loader, criterion, device):
@@ -262,6 +443,28 @@ def validate(model, val_loader, criterion, device):
 
     return avg_loss, accuracy, all_preds, all_labels
 
+# ----------------------------------------------------------------------------
+# TRADITIONAL ML MODEL TRAINING (RANDOM FOREST)
+# ----------------------------------------------------------------------------
+# Trains a Random Forest classifier and evaluates its performance.
+#
+# Benefits:
+# 1. Provides a strong baseline model with different strengths than neural
+#    networks
+# 2. Random Forests handle non-linear relationships well without feature
+#    scaling
+# 3. Built-in feature importance analysis for model interpretability
+# 4. Typically requires less hyperparameter tuning than neural networks
+# 5. Robust to overfitting through ensemble approach
+#
+# Alternatives considered:
+# 1. Logistic Regression - too simple for potentially complex relationships
+# 2. SVM - less interpretable and generally slower for large datasets
+# 3. Gradient Boosting (XGBoost, LightGBM) - Random Forest chosen for balance
+#    of performance and simplicity
+# 4. Decision Tree - Random Forest provides better generalization
+# 5. Ensemble of different models - avoided for simplicity
+
 
 def train_sklearn_models(X_train, X_test, y_train, y_test, output_dir):
     print("Training Random Forest Classifier...")
@@ -297,6 +500,27 @@ def train_sklearn_models(X_train, X_test, y_train, y_test, output_dir):
     print(f"Feature importance plot saved to {output_path}")
 
     return clf, accuracy, report
+
+# ----------------------------------------------------------------------------
+# NEURAL NETWORK TRAINING PIPELINE
+# ----------------------------------------------------------------------------
+# Complete training pipeline for the neural network model with early stopping.
+#
+# Benefits:
+# 1. Comprehensive pipeline handling data preparation, training, validation,
+#    and evaluation
+# 2. Early stopping to prevent overfitting
+# 3. Automatic learning rate adjustment with scheduler
+# 4. Hardware-specific optimizations for different platforms
+# 5. Progress tracking and visualization
+#
+# Alternatives considered:
+# 1. Fixed epochs without early stopping - less efficient and could overfit
+# 2. Different optimizers (SGD, RMSprop) - Adam chosen for adaptive learning
+#    rate
+# 3. Cross-validation - single validation split chosen for efficiency
+# 4. Different loss functions - BCE appropriate for binary classification
+# 5. Fixed learning rate - scheduler allows adaptive rate based on performance
 
 
 def train_neural_model(X_train, X_test,
@@ -416,6 +640,25 @@ def train_neural_model(X_train, X_test,
 
     return model, final_acc
 
+# ----------------------------------------------------------------------------
+# UNSUPERVISED LEARNING: K-MEANS CLUSTERING
+# ----------------------------------------------------------------------------
+# Performs K-means clustering for unsupervised pattern discovery in the data.
+#
+# Benefits:
+# 1. Discovers natural groupings in data without relying on labels
+# 2. Uses silhouette score to determine optimal number of clusters objectively
+# 3. Applies standard scaling for distance-based algorithm
+# 4. Visualizes clusters using PCA for dimensionality reduction
+#
+# Alternatives considered:
+# 1. Hierarchical Clustering - K-means chosen for scalability with larger
+#    datasets
+# 2. DBSCAN - K-means chosen for simplicity and interpretability
+# 3. Gaussian Mixture Models - K-means provides clearer cluster boundaries
+# 4. Spectral Clustering - K-means more efficient for this dataset size
+# 5. Self-organizing maps - K-means more widely understood and interpretable
+
 
 def perform_clustering(X, output_dir):
     print("\nPerforming K-means clustering...")
@@ -457,6 +700,26 @@ def perform_clustering(X, output_dir):
     print(f"Clustering visualization saved to {output_path}")
 
     return cluster_labels
+
+# ----------------------------------------------------------------------------
+# VISUALIZATION OF MODEL RESULTS
+# ----------------------------------------------------------------------------
+# Comprehensive visualization of model training and evaluation metrics.
+#
+# Benefits:
+# 1. Provides visual evaluation of model convergence and performance
+# 2. Includes multiple complementary evaluation metrics (loss, accuracy,
+#    confusion matrix, ROC)
+# 3. Creates professional-quality visualizations for documentation
+# 4. Helps identify potential issues (overfitting, poor convergence)
+#
+# Alternatives considered:
+# 1. Interactive visualizations (Plotly) - static matplotlib chosen for
+#    compatibility
+# 2. Separate plots - combined subplot layout for comprehensive overview
+# 3. Minimal metrics - comprehensive metrics chosen for thorough evaluation
+# 4. Different visualization styles - seaborn/matplotlib provide clean,
+#    publication-ready plots
 
 
 def plot_training_results(train_losses, val_losses, train_accs,
@@ -507,6 +770,23 @@ def plot_training_results(train_losses, val_losses, train_accs,
     plt.savefig(output_path, dpi=300)
     print(f"Training results saved to {output_path}")
 
+# ----------------------------------------------------------------------------
+# COMMAND LINE ARGUMENT PARSING
+# ----------------------------------------------------------------------------
+# Robust command-line interface for both training and prediction modes.
+#
+# Benefits:
+# 1. Provides a user-friendly interface for both training and prediction
+# 2. Clearly documents required parameters with help text
+# 3. Separates prediction options into a logical group
+# 4. Includes usage examples for better usability
+#
+# Alternatives considered:
+# 1. Configuration file - CLI more appropriate for simple parameters
+# 2. Interactive prompts - CLI better for automation and scripting
+# 3. Environment variables - CLI provides better documentation and validation
+# 4. Web interface - CLI simpler for this use case
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -555,6 +835,24 @@ Examples:
 
     return parser.parse_args()
 
+# ----------------------------------------------------------------------------
+# PREDICTION FUNCTION
+# ----------------------------------------------------------------------------
+# Applies the trained model to make predictions on new data.
+#
+# Benefits:
+# 1. Provides a clean interface for real-world fraud prediction
+# 2. Handles all necessary preprocessing of input data
+# 3. Returns both binary prediction and confidence score
+# 4. Uses the same preprocessing steps as training for consistency
+#
+# Alternatives considered:
+# 1. Separate preprocessing - integrated for consistency
+# 2. Different threshold values - 0.5 standard for binary classification
+# 3. Returning only binary prediction - confidence score adds valuable
+#    information
+# 4. Batch prediction - single-instance focus for this interactive use case
+
 
 def predict_fraud(args, model_path, label_encoders, scaler, device):
     input_dim = 9
@@ -592,6 +890,25 @@ def predict_fraud(args, model_path, label_encoders, scaler, device):
     is_fraud = output.item() > 0.5
 
     return is_fraud, probability
+
+# ----------------------------------------------------------------------------
+# MAIN FUNCTION
+# ----------------------------------------------------------------------------
+# Orchestrates the overall workflow of the fraud detection system.
+#
+# Benefits:
+# 1. Separates training and prediction workflows for clarity
+# 2. Implements a complete ML pipeline from data loading to evaluation
+# 3. Handles both supervised (fraud detection) and unsupervised (clustering)
+#    learning
+# 4. Creates comprehensive output directory with all results and visualizations
+#
+# Alternatives considered:
+# 1. Separate scripts for different tasks - integrated for workflow continuity
+# 2. Class-based architecture - procedural approach chosen for simplicity
+# 3. Pipeline framework (e.g., scikit-learn Pipeline) - custom implementation
+#    for flexibility
+# 4. Database integration - file-based approach simpler for this use case
 
 
 def main():

@@ -21,6 +21,28 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm.auto import tqdm
 
+# ----------------------------------------------------------------------------
+# CUSTOM IMAGE FOLDER FOR ROBUST DATASET HANDLING
+# ----------------------------------------------------------------------------
+# A custom implementation of torchvision's ImageFolder that gracefully handles
+# corrupted or problematic images that might otherwise crash training.
+#
+# Benefits:
+# 1. Prevents training failures due to corrupted image files
+# 2. Handles images with transparency layers automatically
+# 3. Improves training robustness by skipping problematic files
+# 4. Maintains dataset integrity without preprocessing steps
+#
+# Alternatives considered:
+# 1. Preprocessing dataset to remove problematic images - adds complexity and
+#    still might miss some issues
+# 2. Using standard ImageFolder with try-except in training - less efficient
+#    and harder to debug
+# 3. Using OpenCV instead of PIL - adds additional dependencies and doesn't
+#    handle some image formats as well
+# 4. Creating separate datasets for each image type - unnecessarily complex
+#    and harder to maintain
+
 
 class SafeImageFolder(torchvision.datasets.ImageFolder):
     def __getitem__(self, index):
@@ -36,6 +58,32 @@ class SafeImageFolder(torchvision.datasets.ImageFolder):
             return image, target
         except (IOError, OSError, RuntimeError):
             return self.__getitem__((index + 1) % len(self.samples))
+
+# ----------------------------------------------------------------------------
+# CONVOLUTIONAL NEURAL NETWORK FOR ART CLASSIFICATION
+# ----------------------------------------------------------------------------
+# A custom CNN architecture specifically designed for art classification with
+# optimized depth, width, and regularization techniques for artistic features.
+#
+# Benefits:
+# 1. Progressive filter expansion (32→64→128→256) captures increasingly complex
+#    artistic features and patterns
+# 2. Double convolution blocks with shared filter sizes enhance feature
+#    extraction
+# 3. BatchNorm layers stabilize training and improve convergence
+# 4. Strategic dropout prevents overfitting to specific artistic styles
+# 5. Proper weight initialization ensures stable gradient flow
+#
+# Alternatives considered:
+# 1. Pre-trained models (ResNet, VGG) - not specialized for artistic features
+#    and would require significant fine-tuning
+# 2. Deeper architectures - could lead to overfitting with limited art datasets
+# 3. Attention mechanisms - would add complexity with uncertain benefits for
+#    this task
+# 4. MobileNet-style separable convolutions - would reduce parameters but might
+#    miss important textural details in artwork
+# 5. Vision Transformers - require significantly more training data and
+#    computational resources than available
 
 
 class OptimizedArtCNN(nn.Module):
@@ -107,6 +155,33 @@ class OptimizedArtCNN(nn.Module):
         x = self.classifier(x)
         return x
 
+# ----------------------------------------------------------------------------
+# TRAINING FUNCTION WITH MIXED PRECISION AND GRADIENT ACCUMULATION
+# ----------------------------------------------------------------------------
+# Optimized training function for a single epoch that supports hardware
+# acceleration techniques like mixed precision and effective batch size
+# expansion through gradient accumulation.
+#
+# Benefits:
+# 1. Mixed precision training dramatically accelerates computation on
+#    supported hardware
+# 2. Gradient accumulation enables effective training with larger batch sizes
+#    without increased memory requirements
+# 3. Real-time progress tracking with performance metrics improves monitoring
+# 4. Platform-agnostic implementation works efficiently across different
+#    compute devices
+#
+# Alternatives considered:
+# 1. Standard training without acceleration techniques - simpler but
+#    significantly slower
+# 2. Distributed training across multiple GPUs - more complex and not necessary
+#    for this scale
+# 3. Using higher-level frameworks like PyTorch Lightning - less control over
+#    implementation details
+# 4. Custom loss scaling without autocast - more prone to numerical instability
+# 5. Fixed batch sizes without accumulation - would limit effective batch size
+#    on memory-constrained devices
+
 
 def train_epoch(model, train_loader, optimizer, criterion, device, scaler=None,
                 grad_accum_steps=1):
@@ -157,6 +232,29 @@ def train_epoch(model, train_loader, optimizer, criterion, device, scaler=None,
 
     return avg_loss, accuracy
 
+# ----------------------------------------------------------------------------
+# MODEL VALIDATION AND EVALUATION
+# ----------------------------------------------------------------------------
+# Comprehensive validation function that evaluates model performance on
+# unseen data and collects metrics for detailed analysis without affecting
+# weights.
+#
+# Benefits:
+# 1. Efficient evaluation using torch.no_grad() to save memory and computation
+# 2. Collects comprehensive metrics including loss, accuracy, and predictions
+# 3. Real-time progress tracking with performance indicators
+# 4. Returns predictions for confusion matrix and further analysis
+#
+# Alternatives considered:
+# 1. Simplified evaluation with only accuracy measurement - less informative
+# 2. Including validation as part of training loop - reduces code clarity
+# 3. Using additional metrics like F1-score or precision/recall
+#    added unnecesary complexity for balanced datasets
+# 4. Test-time augmentation - would improve results but increases validation
+#    time
+# 5. K-fold cross validation - more statistically robust but prohibitively
+#    compute-intensive for large image datasets
+
 
 def validate(model, val_loader, criterion, device):
     """Validate the model"""
@@ -195,6 +293,26 @@ def validate(model, val_loader, criterion, device):
 
     return avg_loss, accuracy, all_preds, all_labels
 
+# ----------------------------------------------------------------------------
+# CROSS-PLATFORM DEVICE DETECTION AND SETUP
+# ----------------------------------------------------------------------------
+# Automatic detection and configuration of the optimal computing device based
+# on the user's hardware, with support for latest accelerators.
+#
+# Benefits:
+# 1. Cross-platform compatibility for maximum performance on any system
+# 2. Explicit support for Apple Silicon MPS acceleration
+# 3. Automatic CUDA detection for NVIDIA GPUs
+# 4. Graceful fallback to CPU when no GPU is available
+# 5. Provides clear feedback about the hardware being used
+#
+# Alternatives considered:
+# 1. Hardcoded device selection - would limit portability across environments
+# 2. Manual selection via command line arguments - adds complexity for users
+# 3. Only supporting CUDA - would miss optimizations on Apple Silicon
+# 4. Using higher-level abstractions like PyTorch Lightning - less control
+#    over hardware-specific optimizations
+
 
 def setup_device():
     """Set up the appropriate device based on the platform"""
@@ -219,6 +337,28 @@ def setup_device():
     else:
         print("No GPU acceleration available - using CPU")
         return torch.device("cpu"), "cpu"
+
+# ----------------------------------------------------------------------------
+# SINGLE IMAGE CLASSIFICATION AND VISUALIZATION
+# ----------------------------------------------------------------------------
+# Function to classify a single image using a trained model and visualize
+# the results with confidence scores and probabilities.
+#
+# Benefits:
+# 1. Handles various image formats including transparency channels
+# 2. Provides confidence scores and top-k predictions for multi-class problems
+# 3. Creates visual output of the classification for easy interpretation
+# 4. Reports detailed probability distribution across classes
+#
+# Alternatives considered:
+# 1. Command-line output only - less intuitive and user-friendly
+# 2. Web service implementation - unnecessarily complex for simple
+#    classification
+# 3. Using raw logits instead of softmax probabilities - less interpretable
+# 4. Batch classification - single image focus is more appropriate for
+#    interactive use
+# 5. Multiple model ensemble - would increase robustness but at significant
+#    performance cost
 
 
 def classify_image(image_path, model_path, device, classes):
@@ -285,6 +425,29 @@ def classify_image(image_path, model_path, device, classes):
 
     except Exception as e:
         print(f"Error processing image: {str(e)}")
+
+# ----------------------------------------------------------------------------
+# MAIN FUNCTION: TRAINING AND EVALUATION PIPELINE
+# ----------------------------------------------------------------------------
+# Complete end-to-end pipeline for art classification including data
+# preparation, model training, evaluation, and result visualization.
+#
+# Benefits:
+# 1. Command-line interface with documentation for easy use
+# 2. Automatic dataset downloading and management
+# 3. Comprehensive training with early stopping to prevent overfitting
+# 4. Platform-specific optimizations for maximum performance
+# 5. Result visualization with training curves and confusion matrix
+# 6. Model persistence for later use in classification
+#
+# Alternatives considered:
+# 1. Configuration file based setup - more complex but less flexible
+# 2. Splitting into multiple scripts - better separation of concerns but more
+#    complex project structure
+# 3. Web or GUI interface - more user-friendly but unnecessarily complex
+# 4. Using an ML framework like PyTorch Lightning - more abstracted but less
+#    control over implementation details
+# 5. Fixed hyperparameters without early stopping - simpler but less effective
 
 
 def main():
