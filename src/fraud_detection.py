@@ -282,7 +282,6 @@ def normalize_features(df):
 #    analysis
 # 3. Interactive visualizations - static plots chosen for simplicity and
 #    compatibility
-# 4. No visualization - would miss important data insights
 
 
 def plot_distributions(df, output_dir):
