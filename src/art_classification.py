@@ -519,10 +519,6 @@ Examples:
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, "training_results.png"), dpi=300)
 
-    torch.save(model.state_dict(), os.path.join(
-        results_dir, "final_art_model.pth"))
-    print(f"Final model saved to {os.path.join(
-        results_dir, 'final_art_model.pth')}")
     print(f"Training results saved to {
           os.path.join(results_dir, 'training_results.png')}")
 
