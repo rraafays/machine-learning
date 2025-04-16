@@ -318,7 +318,6 @@ def plot_distributions(df, output_dir):
 # 2. Point-biserial correlation for categorical vars - simpler approach chosen
 # 3. VIF analysis - correlation matrix provides similar insights with better
 #    visualization
-# 4. No correlation analysis - would miss important feature relationships
 
 
 def plot_correlation_matrix(df, output_dir):
