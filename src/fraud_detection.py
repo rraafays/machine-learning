@@ -62,7 +62,7 @@ from torch.utils.data import (
 # 3. No hidden layers - would limit the model's ability to learn complex
 #    patterns
 # 4. More hidden layers - could lead to overfitting and diminishing returns
-# 5. Different weight initialization schemes - Kaiming chosen as it's optimal
+# 5. Different weight initialization schemes - K aiming chosen as it's optimal
 #    for ReLU networks
 
 
@@ -111,7 +111,7 @@ class FraudClassifier(nn.Module):
 # Benefits of custom Dataset class:
 # 1. Enables efficient batch processing through DataLoader
 # 2. Abstracts data access logic from model training code
-# 3. Handles both supervised (with labels) and unsupervised (without labels)
+# 3. Handles both supervised (labeled) and unsupervised (unlabeled)
 #    use cases
 # 4. Ensures proper tensor formatting required by PyTorch
 #
