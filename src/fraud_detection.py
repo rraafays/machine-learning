@@ -442,7 +442,7 @@ def validate(model, val_loader, criterion, device):
     return avg_loss, accuracy, all_preds, all_labels
 
 # ----------------------------------------------------------------------------
-# TRADITIONAL ML MODEL TRAINING (RANDOM FOREST)
+# ML MODEL TRAINING (RANDOM FOREST)
 # ----------------------------------------------------------------------------
 # Trains a Random Forest classifier and evaluates its performance.
 #
